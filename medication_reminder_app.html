@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>藥物提醒 App</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; display: flex; justify-content: center; padding: 24px 16px; min-height: 100vh; }
+  .app { max-width: 390px; width: 100%; background: #fff; border-radius: 24px; border: 0.5px solid #e5e7eb; overflow: hidden; min-height: 700px; display: flex; flex-direction: column; }
+  .status-bar { background: #6C63FF; padding: 12px 20px 8px; display: flex; justify-content: space-between; align-items: center; }
+  .status-bar span { color: #fff; font-size: 12px; font-weight: 500; }
+  .header { background: #6C63FF; padding: 16px 20px 24px; color: #fff; }
+  .header h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  .header p { font-size: 13px; opacity: 0.85; }
+  .nav { display: flex; border-bottom: 0.5px solid #e5e7eb; }
+  .nav button { flex: 1; padding: 10px 4px; font-size: 12px; background: none; border: none; cursor: pointer; color: #6b7280; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .nav button.active { color: #6C63FF; border-bottom-color: #6C63FF; font-weight: 500; }
+  .content { flex: 1; padding: 16px; overflow-y: auto; }
+  .section { display: none; }
+  .section.visible { display: block; }
+
+  .date-badge { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+  .med-card { background: #f9fafb; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
+  .med-icon { width: 40px; height: 40px; border-radius: 50%; background: #EDE9FE; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .med-icon.taken { background: #D1FAE5; }
+  .med-info { flex: 1; }
+  .med-name { font-size: 15px; font-weight: 500; color: #111827; }
+  .med-time { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .take-btn { padding: 7px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 0.5px solid #d1d5db; background: none; color: #111827; transition: all 0.15s; }
+  .take-btn.taken-btn { background: #D1FAE5; border-color: #6EE7B7; color: #065F46; }
+  .mood-section { margin-top: 20px; }
+  .mood-label { font-size: 14px; font-weight: 500; color: #111827; margin-bottom: 10px; }
+  .mood-row { display: flex; gap: 8px; justify-content: space-between; }
+  .mood-btn { flex: 1; padding: 10px 4px; border-radius: 8px; border: 0.5px solid #e5e7eb; background: #f9fafb; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .mood-btn.selected { border-color: #6C63FF; background: #EDE9FE; }
+  .mood-emoji { font-size: 20px; display: block; margin-bottom: 2px; }
+  .mood-text { font-size: 10px; color: #6b7280; }
+  .note-area { margin-top: 14px; }
+  .note-area textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 0.5px solid #e5e7eb; font-family: inherit; font-size: 13px; resize: none; background: #f9fafb; color: #111827; line-height: 1.6; }
+  .save-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: 8px; background: #6C63FF; color: #fff; border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .save-btn:active { opacity: 0.85; }
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1a1a2e; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  .history-card { background: #f9fafb; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .history-date { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge.yes { background: #D1FAE5; color: #065F46; }
+  .badge.no { background: #FEE2E2; color: #991B1B; }
+  .mood-display { font-size: 16px; }
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-card { flex: 1; background: #f9fafb; border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-num { font-size: 24px; font-weight: 500; color: #6C63FF; }
+  .stat-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+  .reminder-card { background: #f9fafb; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .reminder-info .r-name { font-size: 14px; font-weight: 500; color: #111827; }
+  .reminder-info .r-time { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .toggle { width: 44px; height: 24px; border-radius: 12px; background: #d1d5db; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .toggle.on { background: #6C63FF; }
+  .toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left 0.2s; }
+  .toggle.on::after { left: 23px; }
+  .add-btn { width: 100%; padding: 11px; border-radius: 8px; border: 0.5px dashed #d1d5db; background: none; color: #6b7280; font-size: 14px; cursor: pointer; margin-top: 4px; }
+  .info-box { background: #EDE9FE; border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
+  .info-box p { font-size: 12px; color: #4C1D95; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>● ● ●</span>
+  </div>
+  <div class="header">
+    <h1>寶貝豬的藥物提醒</h1>
+    <p>每天變好多一些 💙</p>
+  </div>
+  <div class="nav">
+    <button class="active" onclick="switchTab('today', this)">今日</button>
+    <button onclick="switchTab('history', this)">記錄</button>
+    <button onclick="switchTab('reminder', this)">提醒設定</button>
+  </div>
+  <div class="content">
+
+    <div id="today" class="section visible">
+      <div class="date-badge" id="today-date"></div>
+      <div id="med-list"></div>
+      <div class="mood-section">
+        <div class="mood-label">今日情緒狀態</div>
+        <div class="mood-row">
+          <div class="mood-btn" onclick="selectMood('very-bad', this)"><span class="mood-emoji">😔</span><span class="mood-text">很差</span></div>
+          <div class="mood-btn" onclick="selectMood('bad', this)"><span class="mood-emoji">😕</span><span class="mood-text">差</span></div>
+          <div class="mood-btn" onclick="selectMood('ok', this)"><span class="mood-emoji">😐</span><span class="mood-text">一般</span></div>
+          <div class="mood-btn" onclick="selectMood('good', this)"><span class="mood-emoji">🙂</span><span class="mood-text">好</span></div>
+          <div class="mood-btn" onclick="selectMood('great', this)"><span class="mood-emoji">😊</span><span class="mood-text">很好</span></div>
+        </div>
+        <div class="note-area">
+          <textarea id="note-input" rows="3" placeholder="記錄今天的狀況（例：睡眠好了一點，心情比較平靜）"></textarea>
+        </div>
+        <button class="save-btn" onclick="saveRecord()">儲存今日記錄</button>
+      </div>
+    </div>
+
+    <div id="history" class="section">
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="stat-taken">0</div><div class="stat-label">本週已食藥</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">連續天數</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-rate">0%</div><div class="stat-label">本週成率</div></div>
+      </div>
+      <div id="history-list"></div>
+    </div>
+
+    <div id="reminder" class="section">
+      <div class="reminder-card">
+        <div class="reminder-info"><div class="r-name">早上提醒</div><div class="r-time">每天 08:00</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="reminder-card">
+        <div class="reminder-info"><div class="r-name">晚上提醒</div><div class="r-time">每天 21:00</div></div>
+        <div class="toggle on" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="reminder-card">
+        <div class="reminder-info"><div class="r-name">晚間複查</div><div class="r-time">每天 22:30</div></div>
+        <div class="toggle" onclick="toggleSwitch(this)"></div>
+      </div>
+      <button class="add-btn" onclick="showToast('可在此新增更多提醒時間 ✨')">+ 新增提醒時間</button>
+      <div class="info-box"><p>💡 真實 App 版本可以設定手機推送通知，時間到會自動提醒老公食藥，你也會收到確認通知。</p></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const meds = [
+    { id: 1, name: '抗抑鬱藥 (Sertraline)', dose: '50mg', time: '早餐後 08:00', taken: false },
+    { id: 2, name: '安眠藥 (Clonazepam)', dose: '0.5mg', time: '睡前 21:00', taken: false },
+  ];
+  let todayMood = null;
+  const records = [
+    { date: '3月24日（昨天）', meds: ['已食', '已食'], mood: '🙂', note: '睡眠有改善' },
+    { date: '3月23日', meds: ['已食', '未食'], mood: '😐', note: '有點疲倦' },
+    { date: '3月22日', meds: ['已食', '已食'], mood: '😊', note: '心情好很多' },
+    { date: '3月21日', meds: ['已食', '已食'], mood: '😕', note: '' },
+    { date: '3月20日', meds: ['已食', '未食'], mood: '😔', note: '很難受' },
+  ];
+
+  function formatDate() {
+    const d = new Date();
+    const days = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+    return d.getMonth()+1 + '月' + d.getDate() + '日 ' + days[d.getDay()];
+  }
+
+  function renderMeds() {
+    document.getElementById('today-date').textContent = formatDate();
+    const list = document.getElementById('med-list');
+    list.innerHTML = meds.map(m => `
+      <div class="med-card" id="med-${m.id}">
+        <div class="med-icon ${m.taken ? 'taken' : ''}">${m.taken ? '✓' : '💊'}</div>
+        <div class="med-info">
+          <div class="med-name">${m.name}</div>
+          <div class="med-time">${m.dose} · ${m.time}</div>
+        </div>
+        <button class="take-btn ${m.taken ? 'taken-btn' : ''}" onclick="markTaken(${m.id})">
+          ${m.taken ? '已食 ✓' : '記錄食藥'}
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function markTaken(id) {
+    const med = meds.find(m => m.id === id);
+    med.taken = !med.taken;
+    renderMeds();
+    if (med.taken) showToast('已記錄 ✓ 做得好！');
+    updateStats();
+  }
+
+  function selectMood(mood, el) {
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    todayMood = mood;
+  }
+
+  function saveRecord() {
+    const note = document.getElementById('note-input').value;
+    if (!todayMood && !note) { showToast('請先選擇情緒或填寫備注'); return; }
+    showToast('今日記錄已儲存 💙');
+    updateStats();
+  }
+
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(tab).classList.add('visible');
+    btn.classList.add('active');
+    if (tab === 'history') renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = records.map(r => `
+      <div class="history-card">
+        <div class="history-date">${r.date}</div>
+        ${r.meds.map((status, i) => `
+          <div class="history-row">
+            <span>${meds[i] ? meds[i].name : '藥物'}</span>
+            <span class="badge ${status === '已食' ? 'yes' : 'no'}">${status}</span>
+          </div>
+        `).join('')}
+        <div class="history-row">
+          <span>情緒</span>
+          <span class="mood-display">${r.mood}${r.note ? ' · ' + r.note : ''}</span>
+        </div>
+      </div>
+    `).join('');
+    updateStats();
+  }
+
+  function updateStats() {
+    const total = records.length;
+    const takenDays = records.filter(r => r.meds.every(s => s === '已食')).length;
+    document.getElementById('stat-taken').textContent = takenDays + meds.filter(m => m.taken).length;
+    document.getElementById('stat-streak').textContent = 3;
+    document.getElementById('stat-rate').textContent = Math.round((takenDays / total) * 100) + '%';
+  }
+
+  function toggleSwitch(el) {
+    el.classList.toggle('on');
+    showToast(el.classList.contains('on') ? '提醒已開啟' : '提醒已關閉');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  renderMeds();
+  updateStats();
+</script>
+</body>
+</html>
